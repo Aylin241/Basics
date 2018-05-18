@@ -1,0 +1,255 @@
+-- Geben Sie mit einem SQL Befehl alle Klausuren aus, zu denen sich Personen angemeldet haben, aber bei **ALLEN** angemeldeten Personen fehlt die Note.
+select klausurnr
+ from anmeldung a
+ where exists --mit not exists dsnn alle sachen die in der tabelle vorhaben sind wird false und umgekehr, und wenn es where exists ist dann wenn es vorhanden ist dann ist es true
+ ( select *
+   from anmeldung
+   where a.klausurnr = klausurnr
+   and note is null);
+
+--finde heraus, wie viele Hersteller in der Datenbank hinterlegt sind ohne mit einem Auto verknüpft zu sein.
+ select count (producer_id) as anzahl
+ from producer p
+ where not exists (select *
+				   from vehicle v
+ 	               where v.producer_id = p.producer_id);
+
+
+
+--Gebe Namen aus, die den HÖCHSTEN GEHALT zwischen den beiden Abteilungen haben
+select ename
+from emp
+where sal between
+	(select max(sal)
+	from emp
+	where deptno=20)
+and
+	(select max(sal)
+	from emp
+	where deptno=10);
+	
+	
+--Gebe DURCHSCHNITTSGEHALT INSGESAMT und von jeweiligen abteilungen aus
+select deptno, (select avg(sal) from emp) as durchschnittsgehalt, avg(sal)
+from emp
+group by deptno;
+
+
+--Welche Bücher (title, year, pages) haben MEHR SEITEN ALS DER DURCHSCHNITT der Bücher der Bibliothek? Ordne die Bücher 
+--aufsteigend nach dem Titel und innerhalb des Titels absteigend nach dem Erscheinungsjahr. 
+select title, year, pages 
+from lib_book
+where pages > (select avg(pages) 
+				from lib_book)
+order by title asc, year desc;
+ 
+ 
+-- Autor mit der Anzahl der von ihm verfassten Bücher gelistet wird. 
+--Dabei sollen nur Autoren berücksichtigt werden, deren Nachname (surname) länger als 9 Zeichen ist und die mehr als ein Buch verfasst haben. 
+ select a.auth_id, count(*)
+ from lib_author a
+ inner join lib_did_write w on (a.auth_id = w.auth_id) 
+ where length (a.surname) > 9 
+ group by a.auth_id
+ having count(*) > 1;
+ 
+ 
+--In welcher Stadt wurde mehr als ein Buch herausgegeben? Erzeuge eine Ausgabe, 
+--die die c_id der Stadt und die Anzahl der dort herausgegebenen Bücher beinhaltet. 
+select c.c_id, count(*) buch_anzahl
+from lib_city c
+inner join  lib_publisher p on (c.c_id = p.c_id)
+inner join lib_book b on (b.pub_id = p.pub_id)
+group by c.c_id
+having count(*) > 1; 
+ 
+
+--Deptno mit den meisten Angestellten: 
+select deptno 
+from emp 
+group by deptno 
+having count(*) = (select max(count(*)) 
+                    from emp 
+                    group by deptno); 
+
+
+--Studiengang, dem die meisten Angebote zugeordnet sind 
+select a.studiengangnr, b.bezeichnung 
+from angebot a 
+left join studiengang b on a.studiengangnr = b.studiengangnr 
+group by a.studiengangnr, b.bezeichnung 
+having count(*) = (select max(count(*)) 
+                    from angebot 
+                    group by studiengangnr); 
+
+--Welches Buch (book_id) wurde bisher am häufigsten ausgeliehen? 
+select l.book_id
+from lib_book l
+inner join lib_contains c on l.book_id=c.book_id
+group by l.book_id
+having count(*) in (select max(count(*))
+					from lib_contains
+					group by book_id);
+
+--Artikel, für den die wenigsten Verkäufe vorliegen
+SELECT a.anr, a.bezeichnung 
+FROM artikel a
+INNER JOIN beinhaltet b ON a.anr = b.anr
+GROUP BY a.anr, a.bezeichnung   
+HAVING COUNT(*) =    (SELECT MIN(COUNT(*))     
+					  FROM beinhaltet     
+					  GROUP BY anr); 
+
+					
+--Alle Kunden mit der Anzahl ihrer Ausleihvorgänge ausgeben
+select lend_id, count(*)
+from lib_rental
+group by lend_id;					
+	
+--gebe alle Kunden aus, die Kein Exemplar zu dem Buch Limit ausgeliehen haben, absteigen sortiert nach Namen
+select lend_id, forename
+from lib_lender
+where lend_id not in (select lend_id
+					from lib_rental
+					where l_id not in (select l_id 
+										from lib_contains
+										where book_id not in (select book_id 
+																from lib_book
+																where title like 'Limit')))
+order by forename desc;
+
+-- Geben Sie alle Personen aus, deren Namen zwischen fünf und zehn Zeichen lang sind und einen Bindestrich (-) enthalten! 
+select forename
+from lib_lender
+where (length(forename) between 5 and 10)
+		and
+	  (forename like '%-%');					
+					
+--Geben Sie alle Kunden aus mit der Anzahl ihrer Bestellungen!
+select forename, count(*) as anzahl_bestellung
+from lib_rental r
+inner join lib_lender l on r.lend_id=l.lend_id
+group by forename;
+
+
+--Geben Sie alle Studenten aus mit der Anzahl ihrer Anmeldungen zu Klausuren!
+select name, count(*)
+from anmeldung a
+inner join studentische_person s on a.matrikelnr=s.matrikelnr
+group by name;
+
+			
+			
+--Gebe Titeln aus, die noch nie ausgeliehen wurden
+select titel
+from videotitel
+where titelnr not in (select vid_titelnr
+					  from videoexemplar
+					  where exnr in (select exnr 
+									 from ausleihe));	
+			
+			
+			
+
+--Welcher Kunde hat den größten Bestellwert generiert?
+select p.pnr,sum(a.preis * b.menge) as Bestellwert
+from person p
+inner join lieferung l on p.pnr=l.pnr
+inner join bestellposition b on l.lieferungsnr=b.lieferungsnr 
+inner join artikel a on b.artikelnr=a.artikelnr
+group by p.pnr
+having sum(a.preis * b.menge) in (select max(sum(a.preis * b.menge))
+								  from person p 
+								  inner join lieferung l on p.pnr=l.pnr
+								  inner join bestellposition b on l.lieferungsnr=b.lieferungsnr 
+								  inner join artikel a on b.artikelnr=a.artikelnr
+								  group by p.pnr);
+
+
+--Welche Artikelnr wurde gemessen an der Menge am wenigsten reklamiert?
+select artikelnr
+from Reklamationposition
+group by artikelnr
+having sum(menge) in (select min(sum(menge))
+                      from Reklamationposition
+                      group by artikelnr);
+								  
+					  								  
+								  
+--Erhöhen Sie das Gehalt aller Mitarbeiterinnen bzw. Mitarbeiter um jeweils 10% .
+update mitarbeiter
+set gehalt = gehalt *1.01;
+			
+			
+--Löschen Sie alle Kunden außer denjenigen mit der Kundennr 1 und jenen, 
+--die eine Reklamation angemeldet haben, welche von der Mitarbeiternr 16 bearbeitet wird.			
+delete 
+from kunde
+where kundennr != 1 and kundennr not in (select kundennr
+										 from reklamation
+										 where reklamationnr in (select reklamationnr
+																 from reklamationposition 
+																 where bearbeitungsnr in (select bearbeitungsnr
+																						  from reklamationbearbeitung
+																						  where Mitarbeiternr=16)));
+
+
+
+			
+--In welchem Fach (nur Fachnr) ist dem Leistungsschein zufolge die Durchschnittsnote am besten.			
+select fachnr
+from leistungsschein
+group by fachnr
+having avg(note) in (select min(b_note)
+					 from (select avg(note) as b_note, fachnr
+						   from leistungsschein
+						   group by fachnr));
+						   
+
+			
+					
+----------------------------------------------------------------------------------------------------------	
+					
+		
+					
+--DATUM
+--Erhöhe bei allen Büchern, deren Erscheinungsjahr mehr als 10 Jahre zurückliegt, die Edition um 1. 
+update lib_book
+set edition =edition+1
+where year < 2017-10;
+
+--Welche Kunden (forename, surname) sind mindestens 25 Jahre alt und haben im Februar Geburtstag? 
+select forename, surname
+from lib_lender
+where birthdat > birthdat + interval '25' year;
+
+--Ermittelt den letzten Tag eines Monats
+Select last_day(sysdate) AS "LETZTER TAG DES AKT.MONATS"
+from dual;
+
+--Rechnet ein Jahr auf das aktuelle Datum
+Select sysdate + Interval '1' year AS "SYSDATE + 1 JAHR"
+from dual;
+
+--Rechnet 7 Monate auf das aktuelle Datum
+Select sysdate + Interval '7' month AS "SYSDATE + 7 Monate"
+from dual;
+
+--Ändern Sie Ihr Geburtdatum  auf den 7. August 1974!
+update person
+set geburtsdatum= to_date('07. August 1974', 'dd. MONTH yyyy')
+where pnr=1;
+
+--Löschen Sie alle Personen, deren letzte Bestellung vom heutigen Tag aus gesehen mehr als ein Jahr zurückliegt
+delete 
+from person
+where pnr in (select pnr
+				from bestellung
+				group by pnr
+				having max(datum) < sysdate -INTERVAL '1' year);
+				
+-- Geben Sie die Personen aus, die mindestens 18 Jahre alt sind! 
+select forename
+from lib_lender
+where birthdate <= sysdate - INTERVAL '18' year;				
+				
